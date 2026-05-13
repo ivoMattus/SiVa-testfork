@@ -16,8 +16,6 @@ jobs:
   auto-merge:
     if: github.actor == 'dependabot[bot]' && github.event.pull_request.base.ref == 'dependency-update' && github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
     steps:
       - name: Fetch Dependabot metadata
         id: meta
@@ -45,6 +43,9 @@ jobs:
               return;
             }
 
+            const maxAttempts = 3;
+            const waitMs = 10000;
+
             const mutation = `
               mutation EnableAutoMerge($pullRequestId: ID!) {
                 enablePullRequestAutoMerge(input: {
@@ -61,18 +62,27 @@ jobs:
               }
             `;
 
-            try {
-              await github.graphql(mutation, {
-                pullRequestId: pr.node_id
-              });
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+              try {
+                await github.graphql(mutation, {
+                  pullRequestId: pr.node_id
+                });
 
-              core.info(`Enabled squash auto-merge for PR #${pull_number}.`);
-            } catch (error) {
-              const message = String(error && error.message ? error.message : error);
-              if (message.includes('Pull request is in unstable status')) {
-                core.warning(`PR #${pull_number} is unstable; auto-merge will be retried on next PR event.`);
+                core.info(`Enabled squash auto-merge for PR #${pull_number} on attempt ${attempt}.`);
                 return;
-              }
+              } catch (error) {
+                const message = String(error && error.message ? error.message : error);
 
-              throw error;
+                if (!message.includes('Pull request is in unstable status')) {
+                  throw error;
+                }
+
+                if (attempt === maxAttempts) {
+                  core.setFailed(`PR #${pull_number} stayed unstable after ${maxAttempts} attempts.`);
+                  return;
+                }
+
+                core.warning(`PR #${pull_number} unstable (attempt ${attempt}/${maxAttempts}); retrying in ${waitMs / 1000}s...`);
+                await new Promise((resolve) => setTimeout(resolve, waitMs));
+              }
             }
