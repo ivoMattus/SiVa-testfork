@@ -43,8 +43,8 @@ jobs:
               return;
             }
 
-            const maxAttempts = 3;
-            const waitMs = 10000;
+            const maxAttempts = 10;
+            const waitMs = 15000;
 
             const mutation = `
               mutation EnableAutoMerge($pullRequestId: ID!) {
