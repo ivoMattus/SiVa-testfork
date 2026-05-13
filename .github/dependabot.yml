@@ -3,6 +3,8 @@ updates:
   - package-ecosystem: "maven"
     directory: "/"
     target-branch: "dependency-update"
+    open-pull-requests-limit: 10
+
     schedule:
       interval: "daily"
       time: "04:00"
@@ -10,19 +12,16 @@ updates:
 
     commit-message:
       prefix: "Dependabot"
-      include: "scope"
 
-    # Prevent major-version bumps; keep updates to patch/minor.
     ignore:
       - dependency-name: "*"
         update-types:
           - "version-update:semver-major"
 
-      # Examples: replace/remove these with exact dependencies you want to ignore.
       - dependency-name: "org.digidoc4j:digidoc4j"
-      - dependency-name: "org.digidoc4j.dss:sd-dss"
+      - dependency-name: "org.digidoc4j.dss:*"
+      - dependency-name: "io.takari.polyglot:polyglot-groovy"
 
-    # Group updates to reduce PR noise.
     groups:
       maven-patch-and-minor:
         patterns:
@@ -30,5 +29,3 @@ updates:
         update-types:
           - "minor"
           - "patch"
-
-    open-pull-requests-limit: 10

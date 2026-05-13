@@ -16,6 +16,8 @@ jobs:
   auto-merge:
     if: github.actor == 'dependabot[bot]' && github.event.pull_request.base.ref == 'dependency-update' && github.event.pull_request.draft == false
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
     steps:
       - name: Fetch Dependabot metadata
         id: meta
@@ -23,51 +25,9 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Detect required approvals on base branch
-        id: review_requirement
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-            const branch = context.payload.pull_request.base.ref;
-
-            try {
-              const result = await github.rest.repos.getBranchProtection({
-                owner,
-                repo,
-                branch
-              });
-
-              const requiredCount = result.data?.required_pull_request_reviews?.required_approving_review_count ?? 0;
-              core.info(`Required approving review count for ${branch}: ${requiredCount}`);
-              core.setOutput('needs_approval', requiredCount > 0 ? 'true' : 'false');
-            } catch (error) {
-              core.warning(`Could not read branch protection for ${branch}: ${error.message}`);
-              core.setOutput('needs_approval', 'false');
-            }
-
-      - name: Auto-approve Dependabot PR
-        if: steps.review_requirement.outputs.needs_approval == 'true'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-            const pull_number = context.payload.pull_request.number;
-
-            await github.rest.pulls.createReview({
-              owner,
-              repo,
-              pull_number,
-              event: 'APPROVE'
-            });
-
-            core.info(`Approved PR #${pull_number} because approvals are required.`);
-
       - name: Enable auto-merge (squash)
         if: steps.meta.outputs.update-type != 'version-update:semver-major'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const owner = context.repo.owner;
@@ -101,8 +61,18 @@ jobs:
               }
             `;
 
-            await github.graphql(mutation, {
-              pullRequestId: pr.node_id
-            });
+            try {
+              await github.graphql(mutation, {
+                pullRequestId: pr.node_id
+              });
 
-            core.info(`Enabled squash auto-merge for PR #${pull_number}.`);
+              core.info(`Enabled squash auto-merge for PR #${pull_number}.`);
+            } catch (error) {
+              const message = String(error && error.message ? error.message : error);
+              if (message.includes('Pull request is in unstable status')) {
+                core.warning(`PR #${pull_number} is unstable; auto-merge will be retried on next PR event.`);
+                return;
+              }
+
+              throw error;
+            }
