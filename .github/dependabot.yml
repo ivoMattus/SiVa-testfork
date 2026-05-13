@@ -7,7 +7,7 @@ updates:
 
     schedule:
       interval: "daily"
-      time: "04:00"
+      time: "15:00"
       timezone: "Europe/Tallinn"
 
     commit-message:
