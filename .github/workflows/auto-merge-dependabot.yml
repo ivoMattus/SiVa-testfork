@@ -23,7 +23,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Enable auto-merge (squash)
+      - name: Merge Dependabot PR (squash)
         if: steps.meta.outputs.update-type != 'version-update:semver-major'
         uses: actions/github-script@v8
         with:
@@ -31,58 +31,34 @@ jobs:
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             const pull_number = context.payload.pull_request.number;
-
-            const { data: pr } = await github.rest.pulls.get({
-              owner,
-              repo,
-              pull_number
-            });
-
-            if (pr.state !== 'open') {
-              core.info(`PR #${pull_number} is not open; skipping.`);
-              return;
-            }
-
-            const maxAttempts = 10;
+            const maxAttempts = 3;
             const waitMs = 15000;
 
-            const mutation = `
-              mutation EnableAutoMerge($pullRequestId: ID!) {
-                enablePullRequestAutoMerge(input: {
-                  pullRequestId: $pullRequestId,
-                  mergeMethod: SQUASH
-                }) {
-                  pullRequest {
-                    number
-                    autoMergeRequest {
-                      enabledAt
-                    }
-                  }
-                }
-              }
-            `;
-
             for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-              try {
-                await github.graphql(mutation, {
-                  pullRequestId: pr.node_id
-                });
+              const { data: pr } = await github.rest.pulls.get({
+                owner,
+                repo,
+                pull_number
+              });
 
-                core.info(`Enabled squash auto-merge for PR #${pull_number} on attempt ${attempt}.`);
+              if (pr.state !== 'open') {
                 return;
-              } catch (error) {
-                const message = String(error && error.message ? error.message : error);
+              }
 
-                if (!message.includes('Pull request is in unstable status')) {
-                  throw error;
-                }
+              if (pr.mergeable === true) {
+                await github.rest.pulls.merge({
+                  owner,
+                  repo,
+                  pull_number,
+                  merge_method: 'squash',
+                  sha: pr.head.sha
+                });
+                return;
+              }
 
-                if (attempt === maxAttempts) {
-                  core.setFailed(`PR #${pull_number} stayed unstable after ${maxAttempts} attempts.`);
-                  return;
-                }
-
-                core.warning(`PR #${pull_number} unstable (attempt ${attempt}/${maxAttempts}); retrying in ${waitMs / 1000}s...`);
+              if (attempt < maxAttempts) {
                 await new Promise((resolve) => setTimeout(resolve, waitMs));
               }
             }
+
+            core.setFailed(`PR #${pull_number} was not mergeable after ${maxAttempts} attempts.`);
