@@ -7,7 +7,7 @@ updates:
 
     schedule:
       interval: "daily"
-      time: "13:30"
+      time: "14:30"
       timezone: "Europe/Tallinn"
 
     exclude-paths:
