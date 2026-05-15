@@ -7,8 +7,11 @@ updates:
 
     schedule:
       interval: "daily"
-      time: "14:30"
+      time: "13:30"
       timezone: "Europe/Tallinn"
+
+    exclude-paths:
+      - ".mvn/**"
 
     commit-message:
       prefix: "Dependabot"
@@ -20,7 +23,6 @@ updates:
 
       - dependency-name: "org.digidoc4j:digidoc4j"
       - dependency-name: "org.digidoc4j.dss:*"
-      - dependency-name: "io.takari.polyglot:polyglot-groovy"
 
     groups:
       maven-patch-and-minor:
