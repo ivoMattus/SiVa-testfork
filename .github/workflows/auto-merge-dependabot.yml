@@ -16,6 +16,7 @@ permissions:
 
 jobs:
   auto-merge:
+    # Additional safeguard: hard-pin this workflow to this repository only.
     if: github.event.pull_request.user.login == 'dependabot[bot]' && github.event.pull_request.head.repo.full_name == github.repository && github.repository == 'ivoMattus/SiVa-testfork' && github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
@@ -47,6 +48,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Merge Dependabot PR (squash)
+        # Additional safeguard: block major updates here too, even though dependabot.yml already ignores them.
         if: steps.meta.outputs.update-type != 'version-update:semver-major'
         uses: actions/github-script@v8
         with:
